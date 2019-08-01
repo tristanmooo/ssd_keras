@@ -30,21 +30,29 @@ def SSD300(input_shape, num_classes=21):
         https://arxiv.org/abs/1512.02325
     """
     net = {}
-    # Block 1
+    # Block 1 卷积层块
     input_tensor = input_tensor = Input(shape=input_shape)
     img_size = (input_shape[1], input_shape[0])
     net['input'] = input_tensor
-    net['conv1_1'] = Convolution2D(64, 3, 3,
-                                   activation='relu',
-                                   border_mode='same',
-                                   name='conv1_1')(net['input'])
+    # 二维卷积层对二维输入进行滑动窗卷积
+    # keras.layers.Conv2D(filters, kernel_size, strides=(1, 1), padding='valid', data_format=None, 
+    # dilation_rate=(1, 1), activation=None, use_bias=True, kernel_initializer='glorot_uniform', 
+    # bias_initializer='zeros', kernel_regularizer=None, bias_regularizer=None, activity_regularizer=None, 
+    # kernel_constraint=None, bias_constraint=None)
+    net['conv1_1'] = Convolution2D(64, 3, 3, # 64个过滤器；kernel_size:3，卷积窗口大小；strides:步长；
+                                   activation='relu', # 激活函数：ReLU
+                                   border_mode='same', # 过滤模式：same/valid
+                                   name='conv1_1')(net['input']) 
     net['conv1_2'] = Convolution2D(64, 3, 3,
                                    activation='relu',
                                    border_mode='same',
                                    name='conv1_2')(net['conv1_1'])
+    # 对空间数据的最大池化
+    # keras.layers.MaxPooling2D(pool_size=(2, 2), strides=None, padding='valid', data_format=None)
+    # strides 默认为 None，为 None 时大小等于 
     net['pool1'] = MaxPooling2D((2, 2), strides=(2, 2), border_mode='same',
                                 name='pool1')(net['conv1_2'])
-    # Block 2
+    # Block 2 卷积层块
     net['conv2_1'] = Convolution2D(128, 3, 3,
                                    activation='relu',
                                    border_mode='same',
@@ -55,7 +63,7 @@ def SSD300(input_shape, num_classes=21):
                                    name='conv2_2')(net['conv2_1'])
     net['pool2'] = MaxPooling2D((2, 2), strides=(2, 2), border_mode='same',
                                 name='pool2')(net['conv2_2'])
-    # Block 3
+    # Block 3 卷积层块
     net['conv3_1'] = Convolution2D(256, 3, 3,
                                    activation='relu',
                                    border_mode='same',
@@ -70,7 +78,7 @@ def SSD300(input_shape, num_classes=21):
                                    name='conv3_3')(net['conv3_2'])
     net['pool3'] = MaxPooling2D((2, 2), strides=(2, 2), border_mode='same',
                                 name='pool3')(net['conv3_3'])
-    # Block 4
+    # Block 4 卷积层块
     net['conv4_1'] = Convolution2D(512, 3, 3,
                                    activation='relu',
                                    border_mode='same',
@@ -85,7 +93,7 @@ def SSD300(input_shape, num_classes=21):
                                    name='conv4_3')(net['conv4_2'])
     net['pool4'] = MaxPooling2D((2, 2), strides=(2, 2), border_mode='same',
                                 name='pool4')(net['conv4_3'])
-    # Block 5
+    # Block 5 卷积层块
     net['conv5_1'] = Convolution2D(512, 3, 3,
                                    activation='relu',
                                    border_mode='same',
@@ -100,7 +108,8 @@ def SSD300(input_shape, num_classes=21):
                                    name='conv5_3')(net['conv5_2'])
     net['pool5'] = MaxPooling2D((3, 3), strides=(1, 1), border_mode='same',
                                 name='pool5')(net['conv5_3'])
-    # FC6
+    
+    # FC6 该层对二维输入进行Atrous卷积，也即膨胀卷积或带孔洞的卷积。
     net['fc6'] = AtrousConvolution2D(1024, 3, 3, atrous_rate=(6, 6),
                                      activation='relu', border_mode='same',
                                      name='fc6')(net['pool5'])
@@ -133,7 +142,13 @@ def SSD300(input_shape, num_classes=21):
                                    name='conv8_2')(net['conv8_1'])
     # Last Pool
     net['pool6'] = GlobalAveragePooling2D(name='pool6')(net['conv8_2'])
+    
     # Prediction from conv4_3
+    # keras.layers.BatchNormalization(axis=-1, momentum=0.99, epsilon=0.001, center=True, scale=True,
+    # beta_initializer='zeros', gamma_initializer='ones', moving_mean_initializer='zeros', moving_variance_initializer='ones', 
+    # beta_regularizer=None, gamma_regularizer=None, beta_constraint=None, gamma_constraint=None)
+    # axis: 整数，需要标准化的轴 （通常是特征轴）
+    # 批量标准化层 (Ioffe and Szegedy, 2014)。在每一个批次的数据中标准化前一层的激活项， 即，应用一个维持激活项平均值接近 0，标准差接近 1 的转换。
     net['conv4_3_norm'] = Normalize(20, name='conv4_3_norm')(net['conv4_3'])
     num_priors = 3
     x = Convolution2D(num_priors * 4, 3, 3, border_mode='same',
